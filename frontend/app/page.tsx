@@ -21,6 +21,9 @@ import {
   Code2,
   Activity,
   ChevronRight,
+  Lightbulb,
+  Search,
+  FileCode,
 } from "lucide-react";
 
 interface AttemptHistory {
@@ -60,6 +63,11 @@ x = 100
 y = 0
 result = x / y  # This will cause a ZeroDivisionError
 print(f"Result: {result}")`);
+  const [originalCode, setOriginalCode] = useState("");
+  const [fixedCode, setFixedCode] = useState("");
+  const [editorTab, setEditorTab] = useState<"current" | "original" | "fixed">(
+    "current"
+  );
   const [maxRetries, setMaxRetries] = useState(3);
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<DebugResponse | null>(null);
@@ -122,6 +130,9 @@ print(f"Result: {result}")`);
     setFinalStatus(null);
     setCurrentStep(1);
     setLoadingState("Initializing Docker sandbox...");
+    setOriginalCode(code);
+    setFixedCode("");
+    setEditorTab("current");
     const startTime = Date.now();
     setExecutionTime(0);
 
@@ -177,6 +188,7 @@ print(f"Result: {result}")`);
                 setLiveHistory((prev) => [...prev, event.data]);
               } else if (event.type === "complete") {
                 // Final result
+                setFixedCode(event.data.final_code);
                 setCode(event.data.final_code);
                 setFinalStatus(event.data.status);
                 setResponse({
@@ -293,7 +305,7 @@ print(f"Result: {result}")`);
             >
               <Activity className="w-4 h-4 text-purple-400" />
               <span className="text-xs font-semibold text-slate-300">
-                🛡️ Security Active
+                Security Active
               </span>
               <div className="flex items-center gap-4 ml-4 text-xs">
                 <div className="flex items-center gap-1.5">
@@ -445,13 +457,44 @@ print(f"Result: {result}")`);
             transition={{ delay: 0.4 }}
             className="flex flex-col overflow-hidden"
           >
-            {/* Editor Header with Button */}
+            {/* Editor Tabs */}
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Code2 className="w-5 h-5 text-cyan-400" />
-                <h2 className="text-base font-semibold text-slate-200">
-                  Code Editor
-                </h2>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setEditorTab("current")}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-t-lg transition-colors ${
+                    editorTab === "current"
+                      ? "bg-cyan-500/20 text-cyan-400 border-b-2 border-cyan-400"
+                      : "bg-slate-800/50 text-slate-400 hover:text-slate-300"
+                  }`}
+                >
+                  <Code2 className="w-3.5 h-3.5 inline mr-1" />
+                  Current Code
+                </button>
+                <button
+                  onClick={() => setEditorTab("original")}
+                  disabled={!originalCode}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-t-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                    editorTab === "original"
+                      ? "bg-rose-500/20 text-rose-400 border-b-2 border-rose-400"
+                      : "bg-slate-800/50 text-slate-400 hover:text-slate-300"
+                  }`}
+                >
+                  <Bug className="w-3.5 h-3.5 inline mr-1" />
+                  Original (Broken)
+                </button>
+                <button
+                  onClick={() => setEditorTab("fixed")}
+                  disabled={!fixedCode}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-t-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                    editorTab === "fixed"
+                      ? "bg-emerald-500/20 text-emerald-400 border-b-2 border-emerald-400"
+                      : "bg-slate-800/50 text-slate-400 hover:text-slate-300"
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 inline mr-1" />
+                  Fixed Code
+                </button>
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-xs text-slate-400">Retries:</label>
@@ -475,8 +518,18 @@ print(f"Result: {result}")`);
               <Editor
                 height="100%"
                 defaultLanguage="python"
-                value={code}
-                onChange={(value) => setCode(value || "")}
+                value={
+                  editorTab === "original"
+                    ? originalCode
+                    : editorTab === "fixed"
+                    ? fixedCode
+                    : code
+                }
+                onChange={(value) => {
+                  if (editorTab === "current") {
+                    setCode(value || "");
+                  }
+                }}
                 theme="vs-dark"
                 options={{
                   fontFamily: "Fira Code, monospace",
@@ -494,6 +547,7 @@ print(f"Result: {result}")`);
                   formatOnPaste: true,
                   autoIndent: "full",
                   tabSize: 4,
+                  readOnly: editorTab !== "current",
                 }}
               />
             </motion.div>
@@ -558,9 +612,10 @@ print(f"Result: {result}")`);
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-xs text-slate-400"
+                  className="text-xs text-slate-400 flex items-center gap-1"
                 >
-                  ⏱️ {executionTime}s
+                  <Clock className="w-3 h-3" />
+                  {executionTime}s
                 </motion.div>
               )}
             </div>
@@ -692,8 +747,8 @@ print(f"Result: {result}")`);
                                 className="border border-purple-500/50 bg-purple-500/5 rounded-lg overflow-hidden"
                               >
                                 <div className="px-3 py-2 bg-purple-500/20 text-purple-400 text-xs font-semibold flex items-center gap-2">
-                                  <Sparkles className="w-3.5 h-3.5" />
-                                  💡 AI Diagnosis
+                                  <Lightbulb className="w-3.5 h-3.5" />
+                                  AI Diagnosis
                                 </div>
                                 <div className="p-3 text-xs text-slate-300">
                                   {attempt.explanation}
@@ -708,8 +763,8 @@ print(f"Result: {result}")`);
                                 className="border border-blue-500/50 bg-blue-500/5 rounded-lg overflow-hidden"
                               >
                                 <div className="px-3 py-2 bg-blue-500/20 text-blue-400 text-xs font-semibold flex items-center gap-2">
-                                  <Activity className="w-3.5 h-3.5" />
-                                  🔍 Iteration-Wise Reasoning
+                                  <Search className="w-3.5 h-3.5" />
+                                  Iteration-Wise Reasoning
                                 </div>
                                 <div className="p-3 text-xs text-slate-300 whitespace-pre-wrap">
                                   {attempt.reasoning}
@@ -725,8 +780,8 @@ print(f"Result: {result}")`);
                                   className="border border-cyan-500/50 bg-cyan-500/5 rounded-lg overflow-hidden"
                                 >
                                   <div className="px-3 py-2 bg-cyan-500/20 text-cyan-400 text-xs font-semibold flex items-center gap-2">
-                                    <Zap className="w-3.5 h-3.5" />
-                                    📊 Code Patch
+                                    <FileCode className="w-3.5 h-3.5" />
+                                    Code Patch
                                   </div>
                                   <div className="bg-slate-950/50 max-h-40 overflow-y-auto">
                                     {renderDiff(attempt.diff)}

@@ -314,6 +314,7 @@ async def debug_code_stream(request: DebugRequest):
     """
     async def event_generator():
         current_code = request.code
+        previous_code = request.code  # Track original code for diff
         
         # Send initialization status
         yield f"data: {{\"type\": \"status\", \"message\": \"Initializing Docker sandbox...\", \"step\": 1}}\n\n"
@@ -330,17 +331,34 @@ async def debug_code_stream(request: DebugRequest):
                 # Send verification status
                 yield f"data: {{\"type\": \"status\", \"message\": \"Code executed successfully!\", \"step\": 5}}\n\n"
                 
-                # Success!
-                attempt_data = {
-                    "type": "attempt",
-                    "data": {
-                        "attempt": attempt,
-                        "output": output,
-                        "exit_code": exit_code,
-                        "explanation": "Code executed successfully",
-                        "diff": None
+                # Success! Show what was fixed if this is not the first attempt
+                if attempt > 1:
+                    # Generate diff to show what was fixed
+                    diff = generate_diff(previous_code, current_code)
+                    attempt_data = {
+                        "type": "attempt",
+                        "data": {
+                            "attempt": attempt,
+                            "output": output,
+                            "exit_code": exit_code,
+                            "explanation": f"Code fixed and executed successfully on attempt {attempt}",
+                            "diff": diff if diff.strip() else None,
+                            "reasoning": f"Previous attempt failed, AI applied fix, and code now executes without errors"
+                        }
                     }
-                }
+                else:
+                    # First attempt succeeded - no fixes needed
+                    attempt_data = {
+                        "type": "attempt",
+                        "data": {
+                            "attempt": attempt,
+                            "output": output,
+                            "exit_code": exit_code,
+                            "explanation": "Code executed successfully on first attempt",
+                            "diff": None,
+                            "reasoning": None
+                        }
+                    }
                 yield f"data: {json.dumps(attempt_data)}\n\n"
                 
                 # Send final success
@@ -383,7 +401,8 @@ async def debug_code_stream(request: DebugRequest):
             }
             yield f"data: {json.dumps(attempt_data)}\n\n"
             
-            # Update code for next iteration
+            # Update code for next iteration and track previous version
+            previous_code = current_code
             current_code = fixed_code
         
         # Max retries exhausted
